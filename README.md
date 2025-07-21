@@ -14,7 +14,7 @@ A simple plugin that makes it possible to search your [Obsidian](https://obsidia
 
 ## Setup
 
-This plugin requires `fd` (`fd-find` on Debian distributions) and `fzf` to be installed.
+This plugin requires `fzf` to be installed.
 
 Before installing the plugin, make sure that the Albert Python plugin is enabled.
 

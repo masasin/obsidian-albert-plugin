@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Albert Obsidian Plugin
 #
-# Requires fd and fzf for search.
+# Requires fzf for search.
 # 
 # > ob <file>
 # 
@@ -21,7 +21,7 @@ from urllib.parse import quote
 from albert import *
 
 md_iid = "3.0"
-md_version = "0.5.2"
+md_version = "0.6.0"
 md_name = "Obsidian"
 md_description = "Search your Obsidian vault and execute commands"
 md_license = "MIT"
@@ -162,21 +162,19 @@ class Plugin(PluginInstance, TriggerQueryHandler):
         return None
 
     def _handle_search_query(self, query_norm: str, vault_path: Path) -> List[Item]:
-        """Performs a fuzzy search by piping the output of `fd` into `fzf`."""
+        """Performs a fuzzy search using fzf's built-in file walker."""
         if not query_norm:
             return []
         try:
-            fd_command = ['fd', '--extension', 'md', '.', str(vault_path)]
-            p_fd = subprocess.Popen(fd_command, stdout=subprocess.PIPE, cwd=str(vault_path))
-
-            fzf_command = ['fzf', '--filter', query_norm.encode('utf-8')]
+            fzf_command = [
+                'fzf',
+                '--filter', query_norm.encode('utf-8'),
+                '--walker-root', str(vault_path)
+            ]
             
             p_fzf = subprocess.Popen(
-                fzf_command, stdin=p_fd.stdout, stdout=subprocess.PIPE
+                fzf_command, stdout=subprocess.PIPE
             )
-
-            if p_fd.stdout:
-                p_fd.stdout.close()
             
             stdout_bytes, _ = p_fzf.communicate()
             
@@ -185,13 +183,14 @@ class Plugin(PluginInstance, TriggerQueryHandler):
             
             stdout = stdout_bytes.decode('utf-8')
             results = []
-            for rel_path_str in stdout.splitlines():
-                full_path_obj = vault_path / Path(rel_path_str)
+            for path_str in stdout.splitlines():
+                if not Path(path_str).name.endswith('.md'):
+                    continue
+                full_path_obj = Path(path_str)
                 results.append(self._create_note_item(full_path_obj, vault_path))
             return results
-        except FileNotFoundError as e:
-            tool_name = "'fd'" if e.filename == "fd" else "'fzf'"
-            return [self._create_error_item(f"{tool_name} Not Found", "Please install it to use this plugin.")]
+        except FileNotFoundError:
+            return [self._create_error_item("'fzf' Not Found", "Please install it to use this plugin.")]
         except subprocess.CalledProcessError as e:
             warning(f"Fuzzy search command failed: {e}")
             return []
