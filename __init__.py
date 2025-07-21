@@ -21,7 +21,7 @@ from urllib.parse import quote
 from albert import *
 
 md_iid = "3.0"
-md_version = "0.5.1"
+md_version = "0.5.2"
 md_name = "Obsidian"
 md_description = "Search your Obsidian vault and execute commands"
 md_license = "MIT"
@@ -168,15 +168,22 @@ class Plugin(PluginInstance, TriggerQueryHandler):
         try:
             fd_command = ['fd', '--extension', 'md', '.', str(vault_path)]
             p_fd = subprocess.Popen(fd_command, stdout=subprocess.PIPE, cwd=str(vault_path))
-            fzf_command = ['fzf', '--filter', query_norm]
+
+            fzf_command = ['fzf', '--filter', query_norm.encode('utf-8')]
+            
             p_fzf = subprocess.Popen(
-                fzf_command, stdin=p_fd.stdout, stdout=subprocess.PIPE, text=True, encoding='utf-8'
+                fzf_command, stdin=p_fd.stdout, stdout=subprocess.PIPE
             )
+
             if p_fd.stdout:
                 p_fd.stdout.close()
-            stdout, _ = p_fzf.communicate()
+            
+            stdout_bytes, _ = p_fzf.communicate()
+            
             if p_fzf.returncode > 1:
-                raise subprocess.CalledProcessError(p_fzf.returncode, fzf_command, stdout)
+                raise subprocess.CalledProcessError(p_fzf.returncode, fzf_command, stdout_bytes)
+            
+            stdout = stdout_bytes.decode('utf-8')
             results = []
             for rel_path_str in stdout.splitlines():
                 full_path_obj = vault_path / Path(rel_path_str)
@@ -198,7 +205,6 @@ class Plugin(PluginInstance, TriggerQueryHandler):
         def execute_placeholder(match: re.Match) -> str:
             command_str = match.group(1)
             try:
-                # Use shlex for robust command parsing
                 command_to_run = shlex.split(command_str)
                 result = subprocess.run(
                     command_to_run, capture_output=True, check=True, text=True, encoding='utf-8'
@@ -214,7 +220,6 @@ class Plugin(PluginInstance, TriggerQueryHandler):
                 warning(f"Shell command '{command_str}' has unclosed quotes.")
                 return ""
 
-        # Use new `{{command}}` syntax
         return re.sub(r'{{(.*?)}}', execute_placeholder, uri)
 
     def _create_note_item(self, file_path: Path, vault_path: Path) -> Item:
