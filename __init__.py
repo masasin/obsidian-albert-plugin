@@ -15,13 +15,13 @@ import subprocess
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 from urllib.parse import quote
 
 from albert import *
 
 md_iid = "3.0"
-md_version = "0.6.0"
+md_version = "0.6.1"
 md_name = "Obsidian"
 md_description = "Search your Obsidian vault and execute commands"
 md_license = "MIT"
@@ -38,7 +38,7 @@ class Command:
     uri: str
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Command":
+    def from_dict(cls, data: dict) -> "Command":
         """Creates a Command instance from a dictionary with safe defaults."""
         return cls(
             name=data.get("name", "Unknown Command"),
@@ -52,7 +52,7 @@ class ConfigManager:
 
     def __init__(self, config_path: Path):
         self.config_path = config_path
-        self._config_data: Optional[Dict] = None
+        self._config_data: dict | None = None
         self._ensure_default_config_exists()
 
     def _ensure_default_config_exists(self):
@@ -82,7 +82,7 @@ class ConfigManager:
         except (IOError, OSError) as e:
             critical(f"Failed to create default config at {self.config_path}: {e}")
 
-    def _load_config(self) -> Dict:
+    def _load_config(self) -> dict:
         """Loads configuration from the JSON file, with error handling."""
         if self._config_data is None:
             try:
@@ -102,7 +102,7 @@ class ConfigManager:
         return Path(self._load_config().get("path_to_vault", ""))
 
     @property
-    def commands(self) -> List[Command]:
+    def commands(self) -> list[Command]:
         command_list = self._load_config().get("commands", [])
         return [Command.from_dict(c) for c in command_list]
 
@@ -159,7 +159,7 @@ class Plugin(PluginInstance, TriggerQueryHandler):
         )
         query.add(fallback_item)
 
-    def _handle_command_query(self, query_norm: str, query_raw: str) -> Optional[Item]:
+    def _handle_command_query(self, query_norm: str, query_raw: str) -> Item | None:
         """Check if the query matches a command and return the appropriate item."""
         for command in self.config.commands:
             cmd_name_norm = unicodedata.normalize("NFC", command.name).casefold()
@@ -170,7 +170,7 @@ class Plugin(PluginInstance, TriggerQueryHandler):
                 return self._create_command_item(command, argument)
         return None
 
-    def _handle_search_query(self, query_norm: str, vault_path: Path) -> List[Item]:
+    def _handle_search_query(self, query_norm: str, vault_path: Path) -> list[Item]:
         """Performs a fuzzy search using fzf's built-in file walker."""
         if not query_norm:
             return []
